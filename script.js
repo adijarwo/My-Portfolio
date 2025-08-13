@@ -47,6 +47,26 @@ gsap.to(letters, {
   },
 });
 
+// download animation
+document.getElementById('downloadBtn').addEventListener('click', function (e) {
+  e.preventDefault(); // tahan dulu
+
+  // Tampilkan spinner, sembunyikan teks
+  document.getElementById('downloadText').classList.add('hidden');
+  document.getElementById('loadingSpinner').classList.remove('hidden', 'relative');
+  document.getElementById('loadingSpinner').classList.add('flex');
+
+  // Simulasi loading 1,5 detik
+  setTimeout(() => {
+    window.location.href = this.getAttribute('href');
+    
+    // Kembalikan tombol ke keadaan awal setelah download dimulai
+    setTimeout(() => {
+      document.getElementById('downloadText').classList.remove('hidden');
+      document.getElementById('loadingSpinner').classList.add('hidden');
+    }, 500);
+  }, 1500);
+});
 
 // Animation for Hobbies Section
 gsap.utils.toArray(".hobby-item").forEach((item, index) => {
