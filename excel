@@ -1,0 +1,112 @@
+Option Explicit
+
+' --- letakkan di Sheet: stiker ---
+Private Sub Worksheet_Change(ByVal Target As Range)
+    On Error GoTo ErrHandler
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+
+    Const inputCell As String = "M4"
+    Const srcColKomposisi As Long = 7   ' kolom G di sheet db
+
+    Dim wsDB As Worksheet: Set wsDB = ThisWorkbook.Worksheets("db")
+    Dim wsSt As Worksheet: Set wsSt = Me
+    Dim f As Range
+    Dim kode As String
+
+    Dim merges(1 To 2) As String
+    Dim tops(1 To 2) As String
+
+    merges(1) = "F21:J23": tops(1) = "F21"
+    merges(2) = "F8:J10":  tops(2) = "F8"
+
+    ' hanya jalan kalau K3 yang diubah
+    If Intersect(Target, wsSt.Range(inputCell)) Is Nothing Then GoTo ExitHandler
+
+    kode = Trim(wsSt.Range(inputCell).Value)
+
+    ' jika kosong -> bersihkan area
+    If kode = "" Then
+        wsSt.Range(merges(1)).ClearContents
+        wsSt.Range(merges(2)).ClearContents
+        GoTo ExitHandler
+    End If
+
+    ' cari ID di kolom A sheet db
+    Set f = wsDB.Columns(1).Find(What:=kode, LookIn:=xlValues, LookAt:=xlWhole)
+    If f Is Nothing Then
+        wsSt.Range(merges(1)).ClearContents
+        wsSt.Range(merges(2)).ClearContents
+        GoTo ExitHandler
+    End If
+
+    ' copy ke masing-masing merged area
+    CopyToMergedRange wsDB.Cells(f.Row, srcColKomposisi), wsSt, tops(1), merges(1)
+    CopyToMergedRange wsDB.Cells(f.Row, srcColKomposisi), wsSt, tops(2), merges(2)
+
+ExitHandler:
+    Application.CutCopyMode = False
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Exit Sub
+
+ErrHandler:
+    MsgBox "Error " & Err.Number & ": " & Err.Description, vbExclamation, "Macro Error"
+    Resume ExitHandler
+End Sub
+
+
+' --- helper: tulis value+format ke merged area dengan aman ---
+Private Sub CopyToMergedRange(srcCell As Range, wsDst As Worksheet, dstTopLeftAddr As String, dstMergeAddr As String)
+    On Error GoTo ErrLocal
+
+    Dim dstMerge As Range, dstTopLeft As Range
+    Dim sLen As Long, i As Long
+
+    Set dstMerge = wsDst.Range(dstMergeAddr)
+    ' unmerge bila perlu
+    If dstMerge.MergeCells Then
+        dstMerge.UnMerge
+    End If
+
+    Set dstTopLeft = wsDst.Range(dstTopLeftAddr)
+
+    ' tulis value ke sel kiri-atas
+    dstTopLeft.Value = srcCell.Value
+
+    ' salin format cell-level ke sel kiri-atas
+    srcCell.Copy
+    dstTopLeft.PasteSpecial Paste:=xlPasteFormats
+    Application.CutCopyMode = False
+
+    ' salin rich-text per karakter (untuk Bold/Italic/Color/dsb.)
+    sLen = Len(dstTopLeft.Value)
+    If sLen > 0 Then
+        For i = 1 To sLen
+            On Error Resume Next
+            With dstTopLeft.Characters(i, 1).Font
+                .Bold = srcCell.Characters(i, 1).Font.Bold
+                .Italic = srcCell.Characters(i, 1).Font.Italic
+                .Underline = srcCell.Characters(i, 1).Font.Underline
+                .Color = srcCell.Characters(i, 1).Font.Color
+                .Size = srcCell.Characters(i, 1).Font.Size
+                .Name = srcCell.Characters(i, 1).Font.Name
+            End With
+            On Error GoTo 0
+        Next i
+    End If
+
+    ' merge kembali area tujuan dan paksa wrap + center
+    wsDst.Range(dstMergeAddr).Merge
+    With wsDst.Range(dstMergeAddr)
+        .WrapText = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+
+    Exit Sub
+ErrLocal:
+    Debug.Print "CopyToMergedRange Error: " & Err.Number & " - " & Err.Description
+    Resume Next
+End Sub
+
